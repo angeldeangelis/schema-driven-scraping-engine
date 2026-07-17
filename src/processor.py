@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 from src.settings import config
 from datetime import datetime
+import logging
 
 def process_to_silver(data):
     if not data:
@@ -33,22 +34,23 @@ def process_to_silver(data):
     logging.info(f"[*] Silver layer updated: {len(df)} records at {output_path}")
 
 # Add this to src/processor.py
-def generate_summary(df):
-    total = len(df)
-    # Using the cleaned numeric column directly
-    avg_price = df['price'].mean() if 'price' in df.columns else 0
+def generate_summary(data):
+    # 1. Convert the raw list of dictionaries into a Pandas DataFrame
+    df = pd.DataFrame(data)
     
-    report = f"""
-    Delivery Notes:
-    - Successfully compiled {total} records.
-    - Verified dataset integrity; clean and ready for analysis.
-    - Calculated market average at {avg_price:.2f}.
-    
-    The requested data is ready for your proposal review.
-    """
-    
-    output_dir = Path("data")
-    output_dir.mkdir(exist_ok=True)
-    with open(output_dir / "delivery_notes.txt", "w") as f:
-        f.write(report)
-    print(report)
+    if df.empty:
+        logging.warning("Data is empty. Cannot generate summary.")
+        return
+
+    # 2. Clean the price column if it exists (strip currency symbols and convert to float)
+    if 'price' in df.columns:
+        # This regex keeps only digits and the decimal point
+        df['price'] = df['price'].astype(str).str.replace(r'[^\d.]', '', regex=True).astype(float)
+        avg_price = df['price'].mean()
+    else:
+        avg_price = 0
+
+    # 3. Print or log your summary
+    logging.info("=== Execution Summary ===")
+    logging.info(f"Total items extracted: {len(df)}")
+    logging.info(f"Average price: {avg_price:.2f}")
