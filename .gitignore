@@ -1,0 +1,14 @@
+# Ignore local environment
+__pycache__/
+.env
+.venv/
+
+# Ignore data and logs
+/data/
+/logs/
+*.csv
+*.xlsx
+*.json
+
+# Ignore system files
+.DS_Store
