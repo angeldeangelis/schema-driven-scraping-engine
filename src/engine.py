@@ -1,28 +1,25 @@
-import asyncio, logging, datetime
+import asyncio, logging, datetime, random
 from pathlib import Path
 from bs4 import BeautifulSoup 
 from playwright.async_api import async_playwright
-from playwright_stealth import Stealth
 from src.settings import config
 
 config.BRONZE_PATH.mkdir(parents=True, exist_ok=True)
 config.SILVER_PATH.mkdir(parents=True, exist_ok=True)
 
+
 def validate_data(data, source_url):
     """
-    Validates data based on the structural fingerprint of the source URL.
+    Validates data based on the schema mapping defined in settings.
     """
-    # 1. Map URLs to their required structural signatures (Fingerprinting)
-    schema_map = {
-        "freelance.com": ['title', 'price'],
-        "jobboard.net": ['job_title', 'compensation', 'location']
-    }
+    # 1. Determine which fields are required based on the domain
+    # We look for the domain in our global config schema map
+    required_fields = next(
+        (fields for domain, fields in config.SCHEMA_MAP.items() if domain in source_url), 
+        ['title', 'price'] # Fallback default
+    )
     
-    # 2. Determine the ruleset dynamically
-    # Default to a basic set if the source is unknown
-    required_fields = next((fields for url, fields in schema_map.items() if url in source_url), ['title', 'price'])
-    
-    # 3. Perform the validation
+    # 2. Perform the validation
     return all(data.get(field) for field in required_fields)
 
 async def get_item(browser, url, parse_item_func, retries=2):
@@ -39,49 +36,55 @@ async def get_item(browser, url, parse_item_func, retries=2):
         logging.info(f"[*] Parsing cached file for {url}")
         with open(existing_files[0], "r", encoding="utf-8") as f:
             soup = BeautifulSoup(f.read(), "html.parser")
-            
-            # --- IMPROVEMENT: USE THE INJECTED PARSER ---
-            # Instead of hardcoding h1/price_color, we call the function passed in
-            data = parse_item_func(soup)
-            
-            # Add metadata
+            data = await parse_item_func(soup)  # Added await here since parse_item_func is async
             data.update({"source_url": url, "scraped_at": "CACHED"})
-            
-            # --- IMPROVEMENT: USE THE DYNAMIC VALIDATOR ---
             return data if validate_data(data, url) else None
 
     # --- PATH 1: LIVE SCRAPE ---
     for attempt in range(retries):
-        context = await browser.new_context()
-        await Stealth().apply_stealth_async(context)
+        context = await browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        )
         page = await context.new_page()
+        
         try:
-            await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+            # 1. APPLY STEALTH (Manual Injection)
+            await page.add_init_script("""
+                Object.defineProperty(navigator, 'webdriver', {
+                    get: () => undefined
+                });
+            """)
             
+            # 2. NAVIGATE
+            await page.goto(url, wait_until="domcontentloaded", timeout=60000)
+            await add_jitter(1, 3) 
+            
+            # 3. SCRAPE (The Data Extraction)
             raw_data = await page.content()
             filename = raw_dir / f"{url_hash}_{datetime.datetime.now().strftime('%H%M%S')}.html"
             with open(filename, "w", encoding="utf-8") as f: 
                 f.write(raw_data)
             
-            # Use the parser with the live page object
             data = await parse_item_func(page)
             
-            # Use the dynamic validator with the source URL fingerprint
+            # 4. VALIDATE & RETURN
             if validate_data(data, url):
                 data.update({
                     "source_url": url, 
                     "scraped_at": datetime.datetime.now().isoformat()
                 })
-                return data
+                return data # Success!
             
             logging.warning(f"Validation failed for {url} on attempt {attempt+1}")
-            return None # Or continue to next attempt if validation failed
             
         except Exception as e:
             logging.error(f"Attempt {attempt+1} failed for {url}: {e}")
             await asyncio.sleep(5)
         finally:
+            # This closes the context ONLY after the scrape attempt is finished
             await context.close()
+            
+    return None
             
 async def run_pipeline(urls, parse_item_func):
     async with async_playwright() as p:
@@ -103,3 +106,7 @@ async def run_pipeline(urls, parse_item_func):
         
         # 4. Return clean data: filter None (failed scrapes/validations)
         return [r for r in results if r is not None]
+
+async def add_jitter(min_seconds=1, max_seconds=3):
+    """Wait for a random time to simulate human behavior."""
+    await asyncio.sleep(random.uniform(min_seconds, max_seconds))
