@@ -109,6 +109,22 @@ class Settings(BaseSettings):
             "pagination_param": "page",
             "pagination_pattern": "{base_clean}?page={i}"
         },
+        "data.wa.gov": {
+        "strategy": "index",
+        "container": "div.slick-row, div.presenter-row, tr",
+        "fields": {
+            "make": "div.column-make, td.make, span.make",
+            "model": "div.column-model, td.model, span.model",
+            "model_year": "div.column-model_year, td.model_year, span.model_year",
+            "electric_range": "div.column-electric_range, td.electric_range, span.electric_range",
+            "link": {"selector": "a", "attribute": "href"}
+        },
+        "strip_url_query": True,
+        "dedup_keys": ["make", "model", "model_year"],
+        "start_page": 1,
+        "pagination_param": "page",
+        "pagination_pattern": "{base_clean}?page={i}"
+        },
     }
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
