@@ -80,6 +80,9 @@ def validate_data(data_items, source_url):
 
     return valid_items
 
+
+
+
 async def universal_parser(page_or_soup, source_url):
     domain, site_cfg = get_domain_config(source_url)
     if not site_cfg:
@@ -221,6 +224,10 @@ async def universal_parser(page_or_soup, source_url):
 
         return await page_or_soup.eval_on_selector_all(container_selector, js_query)
 
+
+
+
+
 async def get_item(browser, url, parse_item_func, retries=2):
     netloc = resolve_url_netloc(url)
     _, schema = get_domain_config(url)
@@ -340,6 +347,13 @@ async def get_item(browser, url, parse_item_func, retries=2):
             
     return None
 
+
+
+
+
+
+
+
 async def run_pipeline(urls, parse_item_func=universal_parser, browser=None):
     owns_browser = browser is None
     playwright_ctx = None
@@ -356,7 +370,14 @@ async def run_pipeline(urls, parse_item_func=universal_parser, browser=None):
 
         async def worker(url):
             async with semaphore:
-                return await get_item(browser, url, parse_item_func)
+                try:
+                    # Graceful wrapper preventing unhandled failures from breaking batch execution
+                    result = await get_item(browser, url, parse_item_func)
+                    return result if result is not None else []
+                except Exception as e:
+                    logging.error(f"[-] Critical worker pipeline failure for target {url}: {e}")
+                    logging.warning(f"[!] Gracefully isolating failure; continuing batch execution.")
+                    return []
 
         tasks = [worker(u) for u in urls[:getattr(config, 'MAX_ITEMS', 5000)]]
         results = await asyncio.gather(*tasks)
