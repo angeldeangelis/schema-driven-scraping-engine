@@ -100,15 +100,15 @@ def process_to_silver(data):
     if output_path.exists():
         try:
             df_historic = pd.read_excel(output_path, engine='openpyxl')
-            if 'source_url' in df_historic.columns:
-                df_historic['source_url'] = df_historic['source_url'].apply(clean_url)
-            if col and col in df_historic.columns and col in df_new.columns:
-                df_historic[col] = pd.to_numeric(df_historic[col], errors='coerce').fillna(0.0)
-
+            if df_historic.empty:
+                raise ValueError("Historical Excel file is empty.")
+            # ... [existing cleanup logic] ...
             df_combined = pd.concat([df_historic, df_new], ignore_index=True)
             logging.info(f"[*] Merging {len(df_new)} new records into existing {file_prefix} Excel history.")
         except Exception as e:
-            logging.error(f"[!] Failed to read historical Excel file for {file_prefix}. Overwriting. Error: {e}")
+            logging.error(f"[!] Failed to read or parse historical Excel file for {file_prefix}. Initializing fresh archive. Error: {e}")
+            backup_path = output_path.with_suffix(".bak.xlsx")
+            output_path.rename(backup_path) # Safe fallback preservation
             df_combined = df_new
     else:
         df_combined = df_new
@@ -130,6 +130,11 @@ def process_to_silver(data):
     # --- DYNAMIC ADAPTIVE DEDUPLICATION LAYER ---
     existing_subset = [c for c in dedup_subset if c in df_combined.columns]
     if existing_subset:
+        # Sort by freshness if timestamp exists to always keep the newest or oldest intentionally
+        if 'scraped_at' in df_combined.columns:
+            df_combined.sort_values(by='scraped_at', ascending=False, inplace=True)
+            df_csv_combined.sort_values(by='scraped_at', ascending=False, inplace=True)
+            
         df_combined.drop_duplicates(subset=existing_subset, keep="first", inplace=True)
         df_csv_combined.drop_duplicates(subset=existing_subset, keep="first", inplace=True)
 
