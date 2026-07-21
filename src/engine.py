@@ -228,7 +228,7 @@ async def universal_parser(page_or_soup, source_url):
 
 
 
-async def get_item(browser, url, parse_item_func, retries=2):
+async def get_item(browser, url, parse_item_func, retries=2, cache_ttl_hours=4):
     netloc = resolve_url_netloc(url)
     _, schema = get_domain_config(url)
     strategy = schema.get("strategy", "detail")
@@ -245,25 +245,35 @@ async def get_item(browser, url, parse_item_func, retries=2):
     file_ext = "json" if strategy == "json" else "html"
     existing_files = list(raw_dir.glob(f"{url_hash}_*.{file_ext}"))
     
-    # --- 1. LOCAL CACHE LAYER ---
+    # --- 1. SMART LOCAL CACHE LAYER WITH TTL VALIDATION ---
     if existing_files and not bypass_cache:
-        logging.info(f"[*] Parsing cached {strategy.upper()} asset file for {url}")
+        cache_file = existing_files[0]
         try:
-            with open(existing_files[0], "r", encoding="utf-8") as f:
-                file_content = f.read()
-                if strategy == "json":
-                    parsed_payload = json.loads(file_content)
+            # Extract timestamp from filename format: {hash}_{HHMMSS}.{ext}
+            filename_parts = cache_file.stem.split("_")
+            if len(filename_parts) > 1:
+                time_str = filename_parts[1]
+                file_time = datetime.strptime(time_str, "%H%M%S").time()
+                file_datetime = datetime.combine(date.today(), file_time)
+                
+                # Check if cache is still fresh within TTL window
+                age_hours = (datetime.now() - file_datetime).total_seconds() / 3600
+                if age_hours < cache_ttl_hours:
+                    logging.info(f"[*] Serving valid cached {strategy.upper()} asset (Age: {age_hours:.2f}h) for {url}")
+                    with open(cache_file, "r", encoding="utf-8") as f:
+                        file_content = f.read()
+                        parsed_payload = json.loads(file_content) if strategy == "json" else BeautifulSoup(file_content, "html.parser")
+                        
+                    data_items = await parse_item_func(parsed_payload, url)  
+                    validated_items = validate_data(data_items, url)
+                    if validated_items:
+                        for item in validated_items:
+                            item.update({"source_url": url, "scraped_at": "CACHED"})
+                        return validated_items
                 else:
-                    parsed_payload = BeautifulSoup(file_content, "html.parser")
-                    
-                data_items = await parse_item_func(parsed_payload, url)  
-                validated_items = validate_data(data_items, url)
-                if validated_items:
-                    for item in validated_items:
-                        item.update({"source_url": url, "scraped_at": "CACHED"})
-                    return validated_items
+                    logging.info(f"[*] Cache expired (Age: {age_hours:.2f}h > {cache_ttl_hours}h TTL). Forcing fresh scrape for {url}")
         except Exception as e:
-            logging.error(f"[-] Cache read execution failed for {url}: {e}")
+            logging.error(f"[-] Cache TTL validation failed for {url}: {e}")
 
     # --- 2. NETWORK LIVE HARVESTING SEQUENCE ---
     for attempt in range(retries):
