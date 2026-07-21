@@ -5,7 +5,7 @@ from datetime import datetime
 from src.settings import config
 from urllib.parse import urlparse
 from src.engine import get_domain_config
-
+from src.validators import validate_record
 
 def process_to_silver(data):
     if not data:
@@ -14,6 +14,32 @@ def process_to_silver(data):
 
     if isinstance(data, dict):
         data = [data]
+
+    # Isolate target source identity early for dynamic domain-based file routing & schema lookup
+    try:
+        sample_url = data[0].get('source_url') if isinstance(data[0], dict) else 'unknown_source'
+        domain, schema = get_domain_config(str(sample_url)) if sample_url and sample_url != 'unknown_source' else (None, {})
+        domain = domain or 'general'
+    except Exception:
+        domain = 'general'
+        schema = {}
+
+    # --- SCHEMA VALIDATION GUARDRAIL ---
+    required_fields = schema.get("dedup_keys", [])
+    if required_fields:
+        valid_records = []
+        for record in data:
+            if validate_record(record, required_fields):
+                valid_records.append(record)
+            else:
+                logging.warning(f"[-] Dropping invalid/incomplete record: {record}")
+        
+        logging.info(f"[*] Validation Check: Retained {len(valid_records)} valid records out of {len(data)} total incoming items.")
+        data = valid_records
+
+    if not data:
+        logging.warning("[!] All incoming records failed validation checks. Aborting silver processing.")
+        return
 
     try:
         df_new = pd.DataFrame(data)
@@ -25,16 +51,6 @@ def process_to_silver(data):
     silver_dir.mkdir(parents=True, exist_ok=True)
 
     col = None
-
-    # Isolate target source identity early for dynamic domain-based file routing
-    try:
-        sample_url = df_new['source_url'].iloc[0] if 'source_url' in df_new.columns else 'unknown_source'
-        domain, schema = get_domain_config(str(sample_url)) if sample_url != 'unknown_source' else (None, {})
-        domain = domain or 'general'
-    except Exception:
-        domain = 'general'
-        schema = {}
-
     domain_clean = "".join([c if c.isalnum() or c in '._-' else '_' for c in domain])
     file_prefix = domain_clean.split('.')[0] if '.' in domain_clean else domain_clean
 
@@ -118,7 +134,6 @@ def process_to_silver(data):
         df_csv_combined.drop_duplicates(subset=existing_subset, keep="first", inplace=True)
 
     # 4. Atomic File Persistence Write Sequences
-
     try:
         df_combined.to_excel(output_path, index=False, engine='openpyxl')
         logging.info(f"[*] Master Excel storage updated: {len(df_combined)} total records saved in {output_path.name}")
