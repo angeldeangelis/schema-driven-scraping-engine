@@ -1,7 +1,7 @@
-# src/validators.py
 import logging
 
 logger = logging.getLogger(__name__)
+
 
 def validate_record(record: dict, required_keys: list) -> bool:
     """
