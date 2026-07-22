@@ -12,3 +12,7 @@ __pycache__/
 
 # Ignore system files
 .DS_Store
+
+/data/bronze/*
+/data/silver/*
+/logs/*
