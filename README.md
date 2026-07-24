@@ -1,30 +1,50 @@
-# ⚙️ Config-Driven Web Scraping Engine
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.11+-blue.svg" alt="Python">
+  <img src="https://img.shields.io/badge/Playwright-Async-green.svg" alt="Playwright">
+  <img src="https://img.shields.io/badge/Pandas-Data%20Processing-orange.svg" alt="Pandas">
+  <img src="https://img.shields.io/badge/OpenPyXL-Excel%20Output-brightgreen.svg" alt="OpenPyXL">
+</p>
 
-**A schema-driven data extraction pipeline built on async Playwright — add a new target site by writing a config block, not new code.**
+<h1 align="center">⚙️ Config-Driven Web Scraping Engine</h1>
 
-Most scraping projects start as a script and die as technical debt: one file per site, duplicated logic everywhere, and a rewrite every time a page structure changes. This engine inverts that. Every site is a declarative schema. The pipeline logic never changes — only the config does.
-
----
-
-## The Problem This Solves
-
-Scraping breaks in predictable ways:
-
-- **Sites load content dynamically** — static HTML parsers miss 30-40% of real data
-- **Anti-bot systems throttle by frequency**, not just User-Agent — naive concurrency gets you IP-banned in minutes
-- **Every new target site means new code** — unless the extraction logic is decoupled from the target's structure
-- **Re-running a scrape duplicates data** — unless deduplication and incremental merging are built in from day one, not bolted on later
-
-This engine was built to solve all four at the architecture level, not with one-off patches.
+<p align="center">
+  <em>A schema-driven data extraction pipeline built on async Playwright — add a new target site by writing a config block, not new code.</em>
+</p>
 
 ---
 
-## How It Works
+## What This Is
+
+Most scraping projects start as a script and die as technical debt: one file per site, duplicated logic everywhere, and a rewrite every time a page structure changes. This engine inverts that. Every site is a **declarative schema**. The pipeline logic never changes — only the config does.
+
+But this isn't just a scraper. It's a **market intelligence infrastructure**. The output isn't raw JSON or CSV dumps. It's a **structured intelligence brief** that answers strategic questions before the client asks them.
+
+---
+
+## Production Benchmarks
+
+Real extraction runs against live, protected marketplaces. No cached data. No synthetic tests.
+
+| Target | Records | Pages | Price Range | Anomalies Detected | Extraction Time |
+|--------|---------|-------|-------------|-------------------|-----------------|
+| **eBay** (laptops) | 480 | 9 | $0.99 – $4,395 | 10 statistical outliers | ~60s |
+| **WeWorkRemotely** (remote jobs) | 50 | 1 | N/A | N/A | ~5s |
+
+**Intelligence output per run:**
+- Price distribution analysis (min, max, mean, median, p90, std)
+- Keyword clustering and low-density signal detection
+- Entity concentration mapping (competitive landscape)
+- Statistical anomaly identification (>3σ outlier detection)
+- **Calibrated strategic question** derived from data gaps
+
+---
+
+## The Architecture
 
 ```
                     ┌─────────────────────┐
-                    │     SCHEMA_MAP       │
-                    │  (config, per domain)│
+                    │   SCHEMA_MAP (JSON)  │
+                    │  (config per domain) │
                     └──────────┬───────────┘
                                │
                     ┌──────────▼───────────┐
@@ -53,12 +73,59 @@ This engine was built to solve all four at the architecture level, not with one-
                     └──────────┬───────────┘
                                │
                     ┌──────────▼───────────┐
-                    │  Excel + CSV Output   │
-                    │  (incremental, atomic)│
+                    │  Market Intelligence  │
+                    │       Brief           │
+                    │ (Excel, 4 sheets)     │
                     └───────────────────────┘
 ```
 
-**One target site = one schema entry.** No new Python files, no new parsing logic.
+### Bronze → Silver → Intelligence
+
+- **Bronze**: Immutable raw cache. Re-process without re-hitting the target.
+- **Silver**: Deduplicated, type-coerced, incrementally merged master dataset.
+- **Intelligence**: Narrative analysis, competitive signals, and strategic questions.
+
+---
+
+## Key Features
+
+🎯 **Schema-driven extraction, three formats, one parser**  
+A single `universal_parser` handles JSON APIs, cached static HTML (BeautifulSoup), and live JS-rendered pages (Playwright). Switching a site from "needs a full browser" to "has a JSON endpoint" is a one-line config change.
+
+⚡ **Concurrency-controlled async harvesting**  
+Semaphore-managed worker pool, not naive `asyncio.gather` on every URL. Configurable limits prevent the frequency-based throttling that gets naive scrapers banned.
+
+🕵️ **Stealth session architecture**  
+Webdriver flag masking, realistic fingerprint consistency, randomized scroll simulation, and 403-triggered fallback fetch — built for sites that actively detect automation.
+
+💾 **Bronze → Silver data layering**  
+Raw responses cached to disk before parsing. Re-processing (new dedup logic, fixed parser) never requires re-hitting the target. Structured output lands in incrementally merged Excel masters.
+
+🔁 **Incremental merge + adaptive deduplication**  
+Every run merges against existing history. Dedup keys are configurable per-schema (title+URL, job title+company, etc.) with domain-appropriate fallbacks.
+
+🛡️ **Resilient by default**  
+Retry with backoff, empty-page circuit breaker, graceful 403 fallback, and safe browser context cleanup even on failure.
+
+---
+
+## Quick Start
+
+```bash
+git clone https://github.com/angeldeangelis/schema-driven-scraping-engine.git
+cd schema-driven-scraping-engine
+pip install -r requirements.txt
+playwright install chromium
+python main.py --urls "https://quotes.toscrape.com" --limit 50
+```
+
+Output lands in `data/silver/` — a master Excel file with full history, plus a dated CSV snapshot in `data/samples/`.
+
+---
+
+## Adding a New Target Site
+
+Open `src/settings.py`, add an entry to `SCHEMA_MAP`:
 
 ```python
 "example-shop.com": {
@@ -74,83 +141,37 @@ This engine was built to solve all four at the architecture level, not with one-
 }
 ```
 
-That's the entire integration surface for a new site.
+Run it. No new Python files. No new parsing branches. That's the entire integration surface.
 
 ---
 
-## Key Features
+## What This Isn't
 
-**🎯 Schema-driven extraction, three formats, one parser**
-A single `universal_parser` handles JSON APIs, cached static HTML (BeautifulSoup), and live JS-rendered pages (Playwright) — the same field-mapping schema works across all three, so switching a site from "needs a full browser" to "has a JSON endpoint" is a one-line config change, not a rewrite.
+This is an **engine**, not a plug-and-play scraper for every site on the internet.
 
-**⚡ Concurrency-controlled async harvesting**
-Semaphore-managed worker pool, not naive `asyncio.gather` on every URL at once. Configurable concurrency limits prevent the exact frequency-based throttling that gets naive scrapers IP-banned.
+- Sites with aggressive bot-detection (Cloudflare challenge pages, heavy fingerprinting) may need additional evasion tuning.
+- Selectors are inherently site-specific — you'll always need to inspect the target DOM and write a schema.
+- What this removes is everything *around* that: browser orchestration, concurrency management, caching, deduplication, incremental storage, and intelligence synthesis — so you're only ever solving the one problem that's actually unique to your target.
 
-**🕵️ Stealth session handling**
-Webdriver flag masking, realistic session pre-warming, randomized scroll simulation, and 403-triggered fallback fetch — built for sites that actively try to detect automation, not just static pages.
+---
 
-**💾 Bronze → Silver data layering**
-Raw responses are cached to disk (`bronze/`) before any parsing happens, timestamped and hashed by URL. This means re-processing a scrape (new dedup logic, fixed parser bug) never requires re-hitting the target site. Validated, structured output lands in `silver/` — Excel master files with full history, plus clean per-run CSV snapshots.
+## Available for Hire
 
-**🔁 Incremental merge + adaptive deduplication**
-Every run merges against existing history rather than overwriting it. Dedup keys are configurable per-schema (title+URL, job title+company, whatever fits the domain) with sane fallbacks when a schema doesn't specify one.
+I build and operate custom data intelligence pipelines for competitive analysis, pricing monitoring, lead generation, and market research.
 
-**🛡️ Resilient by default**
-Retry logic with backoff, empty-page circuit breaker (halts pagination after N consecutive empty results instead of looping forever), graceful fallback fetch on 403 responses, and safe browser context cleanup even on failure.
+- **Upwork**: [Hire me](upwork.com/freelancers/~015591486ae29424db?__cf_chl_rt_tk=J37qIhQS5fdtCDRVnvz6aBkuzDkY23v3pDdWUBWXT7U-1784932063-1.0.1.1-1KmkkgkaLStbFMyQhD_4CVHzew54yZ7SxaBQnf4eXZQ)
+- **Email**: angeldeangelis1@gmail.com
+
+If your project involves extracting structured intelligence from messy web environments, I can probably help.
 
 ---
 
 ## Tech Stack
 
 | Layer | Tool |
-|---|---|
+|-------|------|
 | Browser automation | Playwright (async) |
-| HTTP fallback | HTTPX |
 | Parsing | BeautifulSoup4 + native Playwright DOM evaluation |
 | Data processing | Pandas |
 | Config management | Pydantic Settings |
 | Output | OpenPyXL (Excel) + CSV |
-
----
-
-## Quick Start
-
-```bash
-git clone https://github.com/angeldeangelis/schema-driven-scraping-engine.git
-cd schema-driven-scraping-engine
-pip install -r requirements.txt
-playwright install chromium
-```
-
-```bash
-python main.py --urls "https://quotes.toscrape.com" --limit 50
-```
-
-Output lands in `data/silver/` — a master Excel file with full history, plus a dated CSV snapshot in `data/samples/`.
-
----
-
-## Adding a New Target Site
-
-1. Open `src/settings.py`
-2. Add an entry to `SCHEMA_MAP` keyed by domain
-3. Define `strategy` (`json` / `index` / `rss` / `detail`), `container`, and `fields`
-4. Run it
-
-No new Python files. No new parsing branches. That's the entire point of the architecture.
-
----
-
-## What This Isn't
-
-This is a boilerplate engine, not a plug-and-play scraper for every site on the internet. Sites with aggressive bot-detection (Cloudflare challenge pages, heavy fingerprinting) may need additional evasion tuning beyond what's here. Selectors are inherently site-specific — you'll always need to inspect your target's DOM and write a schema for it. What this engine removes is everything *around* that: the browser orchestration, the concurrency management, the caching, the deduplication, the incremental storage — so you're only ever solving the one problem that's actually unique to your target.
-
----
-
-## License
-
-MIT — use it, fork it, adapt it. If it saves you the week it took to build, that's the point.
-
----
-
-Built and maintained by [Ángel de Angelis](https://github.com/angeldeangelis). Questions or want a version tailored to a specific pipeline? [Reach out](#).
