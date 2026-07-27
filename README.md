@@ -23,14 +23,16 @@ But this isn't just a scraper. It's a **market intelligence infrastructure**. Th
 
 ## Production Benchmarks
 
-Real extraction runs against live, protected marketplaces. No cached data. No synthetic tests.
+Real extraction runs against live, protected marketplaces and job platforms. No cached data. No synthetic tests.
 
-| Target | Records | Pages | Price Range | Anomalies Detected | Extraction Time |
-|--------|---------|-------|-------------|-------------------|-----------------|
-| **eBay** (laptops) | 480 | 9 | $0.99 – $4,395 | 10 statistical outliers | ~60s |
-| **WeWorkRemotely** (remote jobs) | 50 | 1 | N/A | N/A | ~5s |
+| Target | Records | Pages | Data Class | Extraction Time |
+|--------|---------|-------|------------|-----------------|
+| **Amazon** (laptops) | 50+ | 3 | Product catalog + ratings + review metadata | ~45s |
+| **Gymshark** (apparel) | 100+ | 3 | Product SKUs + dynamic pricing | ~60s |
+| **Allbirds** (footwear) | 50+ | 1 | Product variants + colorways + price points | ~30s |
+| **WeWorkRemotely** (jobs) | 50+ | 1 | Job listings + hiring companies + role metadata | ~5s |
 
-**Intelligence output per run:**
+**Pipeline output per run:**
 - Price distribution analysis (min, max, mean, median, p90, std)
 - Keyword clustering and low-density signal detection
 - Entity concentration mapping (competitive landscape)
@@ -55,28 +57,28 @@ Real extraction runs against live, protected marketplaces. No cached data. No sy
                                │
               ┌────────────────┼────────────────┐
               ▼                ▼                 ▼
-       ┌────────────┐   ┌────────────┐   ┌──────────────┐
-       │  Async      │   │  Universal  │   │  Bronze Cache │
-       │  Playwright │──▶│   Parser    │──▶│  (raw HTML/   │
-       │  Harvester  │   │ (3 formats) │   │   JSON, dated)│
-       └────────────┘   └────────────┘   └──────────────┘
+       ┌────────────┐     ┌────────────┐    ┌──────────────┐
+       │  Async     │     │  Universal │    │  Bronze Cache│
+       │  Playwright│──▶ │   Parser    │──▶│  (raw HTML/  │
+       │  Harvester │     │ (3 formats)│    │  JSON, dated)│
+       └────────────┘     └────────────┘    └──────────────┘
                                │
                     ┌──────────▼───────────┐
-                    │   Validation Layer    │
-                    │ (schema-aware filter) │
+                    │   Validation Layer   │
+                    │ (schema-aware filter)│
                     └──────────┬───────────┘
                                │
                     ┌──────────▼───────────┐
-                    │  Silver Processor     │
-                    │ dedup + merge + type  │
-                    │      coercion         │
+                    │  Silver Processor    │
+                    │ dedup + merge + type │
+                    │      coercion        │
                     └──────────┬───────────┘
                                │
                     ┌──────────▼───────────┐
-                    │  Market Intelligence  │
-                    │       Brief           │
-                    │ (Excel, 4 sheets)     │
-                    └───────────────────────┘
+                    │  Market Intelligence │
+                    │       Brief          │
+                    │ (Excel, 4 sheets)    │
+                    └──────────────────────┘
 ```
 
 ### Bronze → Silver → Intelligence
@@ -159,7 +161,7 @@ This is an **engine**, not a plug-and-play scraper for every site on the interne
 
 I build and operate custom data intelligence pipelines for competitive analysis, pricing monitoring, lead generation, and market research.
 
-- **Upwork**: [Hire me](upwork.com/freelancers/~015591486ae29424db?__cf_chl_rt_tk=J37qIhQS5fdtCDRVnvz6aBkuzDkY23v3pDdWUBWXT7U-1784932063-1.0.1.1-1KmkkgkaLStbFMyQhD_4CVHzew54yZ7SxaBQnf4eXZQ)
+- **Upwork**: [Hire me](https://www.upwork.com/freelancers/~015591486ae29424db)
 - **Email**: angeldeangelis1@gmail.com
 
 If your project involves extracting structured intelligence from messy web environments, I can probably help.
